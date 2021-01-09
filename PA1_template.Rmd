@@ -1,25 +1,139 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Guillem Mitjà"
+date: "9/1/2021"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
+# Read the activity data
+By this code, the file activity.csv is read and the dates converted to the proper date type
+```{r}
+Activity <- read.csv("activity.csv")
+Activity$date <- as.Date(as.character(Activity$date),"%Y-%m-%d")
+```
 
 
+# Calculation of the total number of steps per day
+Now, the total number of steps per day is calculated and plot in the following histogram 
+```{r echo=FALSE,results='hide',fig.keep='all'}
+StepsDay <- with(na.omit(Activity), tapply(steps, date, sum))
+par(mfrow = c(1,1), mar = c(1,1,1,1))
+hist(StepsDay, breaks = 30, main = "Histogram total daily steps")
+dev.copy(png, file = "figures/plot1.png")
+dev.off()
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+# Mean and median of steps per day
+The calculated mean of the steps per day is `r format(mean(StepsDay), digits = 7)` steps. The median is `r median(StepsDay)` steps.
+
+
+# Calculate Daily pattern
+
+The following plot shows an averaged daily pattern for each interval of five minuts accross a day.
+
+```{r echo=FALSE,results='hide',fig.keep='all'}
+StepPattern <- with(na.omit(Activity), tapply(steps, interval, mean))
+plot(unique(Activity$interval),StepPattern, type = "l", main = "Daily average pattern")
+dev.copy(png, file = "figures/plot2.png")
+dev.off()
+max(StepPattern)
+```
+
+
+# Missing values adjustment and analysis
+
+The total number of missing values is `r sum(is.na(Activity$steps))`. We can see how they compare to the values that are no na.
+
+```{r echo = FALSE, results = 'hide'}
+TabNA <- table(is.na(Activity$steps))
+names(TabNA) <- c("Good values", "NA values")
+```
+
+```{r echo=FALSE}
+knitr::kable(
+  TabNA
+)
+```
+
+# Filling the gaps
+
+Using this code, the values that are NA are filled with the mean value for that specific interval for all the recorded measurements.
+
+```{r}
+ActivityNoNa <- Activity
+for (i in 1:length(Activity$steps)) {
+  if (is.na(Activity$steps[i])){
+    if (i%%288 == 0){
+      ActivityNoNa$steps[i] <- StepPattern[[288]]
+    }else{
+      ActivityNoNa$steps[i] <- StepPattern[[i %% 288]]}
+    } else{
+      ActivityNoNa$steps[i] <- Activity$steps[i]
+    }
+}
+```
+
+
+## Calculate mean and median
+
+Once we have filled the NA gaps, the histogram of the total steps per day is generated again to compare the values after the NA removal.
+
+```{r echo=FALSE,results='hide',fig.keep='all'}
+StepsDayNoNa <- with(ActivityNoNa, tapply(steps, date, sum))
+hist(StepsDayNoNa, breaks = 30, main = "Total Steps without n/a")
+dev.copy(png, file = "figures/plot3.png")
+dev.off()
+```
+
+The calculated mean of the steps per day after NA removal is `r format(mean(StepsDayNoNa), digits = 7)` steps. The median is `r format(median(StepsDayNoNa), digits = 7)` steps.
+The following table shows the comparison
+
+```{r echo=FALSE,results='hide'}
+MatSteps <- matrix(c(mean(StepsDay), median(StepsDay),mean(StepsDayNoNa),median(StepsDayNoNa)) ,nrow = 2, ncol = 2)
+rownames(MatSteps) <- c("mean", "median")
+colnames(MatSteps) <- c("Original", "NA removed")
+```
+```{r echo=FALSE}
+knitr::kable(
+  MatSteps
+)
+```
+The results are quite similar. Only the mean has been slightly affected after the NA correction. 
+
+# Weekdays and weekend comparison
+
+The first step is to add the type of day at the Activity dataset. The following code does it.
+
+```{r results='hide'}
+for (i in 1:length(ActivityNoNa$steps)) {
+  if(weekdays(ActivityNoNa$date[i]) == ("dissabte") | weekdays(ActivityNoNa$date[i]) == ("diumenge")){
+    ActivityNoNa$TypeDay[i] <- "weekend"
+  }
+  else {
+    ActivityNoNa$TypeDay[i] <- "weekday"
+  }
+}
+ActivityNoNa$TypeDay <- as.factor(ActivityNoNa$TypeDay)
+```
+
+# Plot Weekend and weekday 
+
+The following plot compares the average of steps in a Weekday and in a weekend.
+
+```{r echo=FALSE,results='hide',fig.keep='all'}
+StepPatternWeekend <- with(ActivityNoNa[ActivityNoNa$TypeDay == "weekend",], tapply(steps, interval, mean))
+StepPatternWeekday <- with(ActivityNoNa[ActivityNoNa$TypeDay == "weekday",], tapply(steps, interval, mean))
+par(mfrow = c(2,1), mar=c(4,4,0.2,0.2))
+plot(unique(Activity$interval),StepPatternWeekend,  type = "l", xlab = "Interval", ylab = "Steps Weekend")
+plot(unique(Activity$interval),StepPatternWeekday,  type = "l", xlab = "Interval", ylab = "Steps Weekday")
+dev.copy(png, file = "figures/plot4.png")
+dev.off()
+```
+
+
+
+
